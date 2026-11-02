@@ -54,7 +54,7 @@ export const POST = handle(async (req) => {
   const make = () =>
     Conversation.findOneAndUpdate(
       { pairKey: key },
-      { $set: productFields, $setOnInsert: { participants: [uid, body.userId], pairKey: key, unread: {} } },
+      { ...(body.productId ? { $set: productFields } : {}), $setOnInsert: { participants: [uid, body.userId], unread: {} } },
       { upsert: true, new: true }
     );
   let convo;

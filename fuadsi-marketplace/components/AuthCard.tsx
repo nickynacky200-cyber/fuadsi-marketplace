@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff, Loader2, MailCheck } from "lucide-react";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { useToast } from "@/components/providers/ToastProvider";
+import { firebaseConfigured } from "@/lib/firebase-client";
 import { PAYMENT_NOTICE } from "@/lib/constants";
 
 function GoogleG() {
@@ -23,12 +24,18 @@ const FRIENDLY: Record<string, string> = {
   "auth/weak-password": "Choose a stronger password (at least 8 characters).",
   "auth/too-many-requests": "Too many attempts. Wait a few minutes and try again.",
   "auth/network-request-failed": "Network problem. Check your connection and try again.",
-  "auth/operation-not-allowed": "Email sign-in isn't enabled yet. Enable Email/Password in Firebase Authentication.",
+  "auth/operation-not-allowed": "This sign-in method isn't enabled. In Firebase console, Authentication, Sign-in method: enable Google and Email/Password.",
+  "auth/unauthorized-domain": "This website's domain isn't authorised. In Firebase console, Authentication, Settings, Authorized domains: add this site's domain (e.g. fuadsi-marketplace.vercel.app).",
+  "auth/invalid-api-key": "The Firebase API key is missing or wrong in this deployment. Set NEXT_PUBLIC_FIREBASE_* in Vercel and Redeploy.",
+  "auth/api-key-not-valid.-please-pass-a-valid-api-key.": "The Firebase API key is wrong. Check NEXT_PUBLIC_FIREBASE_API_KEY in Vercel and Redeploy.",
+  "auth/configuration-not-found": "Firebase Authentication isn't set up for this project yet. Open Authentication in the Firebase console and click Get started.",
+  "auth/popup-blocked": "Your browser blocked the sign-in popup. Allow popups for this site and try again.",
+  "auth/web-storage-unsupported": "Your browser blocks storage needed to sign in. Disable private mode or content blockers, or open the site in Chrome/Safari.",
 };
-const explain = (e: any) => FRIENDLY[e?.code] || "That didn't work. Please try again.";
+const explain = (e: any) => FRIENDLY[e?.code] || (e?.code ? `Sign-in failed (${e.code}).` : e?.message || "That didn't work. Please try again.");
 
 export function AuthCard({ mode }: { mode: "login" | "signup" }) {
-  const { me, loading, signInWithGoogle, signUpWithEmail, signInWithEmail, resetPassword, resendVerification, checkVerified, logout, authError } = useAuth();
+  const { me, loading, signedIn, refresh, signInWithGoogle, signUpWithEmail, signInWithEmail, resetPassword, resendVerification, checkVerified, logout, authError } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
   const sp = useSearchParams();
@@ -64,6 +71,21 @@ export function AuthCard({ mode }: { mode: "login" | "signup" }) {
     run(async () => { await resetPassword(email.trim()); toast("success", "Password reset email sent. Check your inbox (and spam)."); });
   };
 
+  // Firebase accepted the sign-in but our server could not load the account: show the real reason
+  if (!loading && signedIn && !me) {
+    return (
+      <div className="container-x flex min-h-[70vh] items-center justify-center py-8">
+        <div className="card w-full max-w-md space-y-4 p-6">
+          <h1 className="text-xl font-extrabold">Signed in, but we couldn&apos;t load your account</h1>
+          <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700" role="alert">{authError || "Unknown server error."}</p>
+          <p className="text-xs text-ink-soft">This is a server configuration problem, not your password. Open <a className="font-bold text-brand-600 underline" href="/api/health" target="_blank" rel="noopener noreferrer">/api/health</a> to see which service (database, Firebase Admin, Redis, Cloudinary) is failing.</p>
+          <button className="btn btn-primary w-full" disabled={busy} onClick={() => run(refresh)}>Try again</button>
+          <button className="btn btn-ghost w-full" onClick={logout}>Sign out</button>
+        </div>
+      </div>
+    );
+  }
+
   // Signed in with email/password but the address isn't confirmed yet
   if (!loading && me && !me.emailVerified) {
     return (
@@ -84,6 +106,7 @@ export function AuthCard({ mode }: { mode: "login" | "signup" }) {
   return (
     <div className="container-x flex min-h-[70vh] items-center justify-center py-8">
       <div className="card w-full max-w-md overflow-hidden">
+        {!firebaseConfigured() && <p className="bg-red-50 p-3 text-xs font-semibold text-red-700" role="alert">This deployment was built without the NEXT_PUBLIC_FIREBASE_* variables. Add them in Vercel, then <b>Redeploy</b> (these values are baked in at build time).</p>}
         <div className="relative bg-gradient-to-br from-brand-700 to-brand-500 px-6 pb-8 pt-7 text-white">
           <Image src="/images/illustrations/chat.webp" alt="" width={110} height={106} className="absolute right-4 top-3 h-24 w-auto opacity-95" />
           <h1 className="text-2xl font-extrabold">{signup ? "Join FUADSI Marketplace" : "Welcome back"}</h1>

@@ -23,15 +23,21 @@ export async function api<T = any>(path: string, opts: Opts = {}): Promise<T> {
     if (token) headers.Authorization = `Bearer ${token}`;
   }
   let res: Response;
+  const timeout = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => { timedOut = true; timeout.abort(); }, 25000); // never spin forever
   try {
     res = await fetch(`/api${path}`, {
       method: opts.method || "GET",
       headers,
       body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
-      signal: opts.signal,
+      signal: opts.signal ?? timeout.signal,
       cache: "no-store",
     });
+    clearTimeout(timer);
   } catch (e: any) {
+    clearTimeout(timer);
+    if (timedOut) throw new ApiClientError(0, "The server took too long to respond. Check /api/health for configuration problems.", "TIMEOUT");
     if (e?.name === "AbortError") throw e;
     throw new ApiClientError(0, "Can't reach the server. Check your connection and try again.", "NETWORK");
   }

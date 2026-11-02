@@ -5,6 +5,7 @@ import { adminProductActionSchema } from "@/lib/validators";
 import { Product } from "@/models/Product";
 import { Favourite } from "@/models/Favourite";
 import { Order } from "@/models/Order";
+import { User } from "@/models/User";
 import { audit } from "@/lib/audit";
 import { notify } from "@/lib/notify";
 import { destroyImages } from "@/lib/cloudinary";
@@ -23,7 +24,9 @@ export const PATCH = handle(async (req, { params }: Ctx) => {
 
   if (action === "approve") {
     if (!["PENDING_APPROVAL", "REJECTED"].includes(p.status)) throw new ApiError(400, "Only pending or rejected listings can be approved.");
-    if (seller === String(admin._id)) throw new ApiError(403, "You can't approve your own listing. Ask another administrator.");
+    if (seller === String(admin._id) && (await User.countDocuments({ role: "admin", suspended: false })) > 1) {
+      throw new ApiError(403, "You can't approve your own listing. Ask another administrator.");
+    }
     p.status = p.quantity > 0 ? "APPROVED" : "SOLD_OUT";
     p.rejectionReason = "";
     await notify({ user: seller, type: "product_approved", title: "Your listing is live", body: p.title, link });

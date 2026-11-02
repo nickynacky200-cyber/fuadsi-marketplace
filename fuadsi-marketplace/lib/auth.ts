@@ -15,10 +15,19 @@ export function bearerToken(req: Request): string | null {
 export async function getAuthUser(req: Request) {
   const token = bearerToken(req);
   if (!token) return null;
+  const auth = adminAuth(); // throws a clear CONFIG error when credentials are missing/invalid
   let decoded;
   try {
-    decoded = await adminAuth().verifyIdToken(token);
-  } catch {
+    decoded = await auth.verifyIdToken(token);
+  } catch (e: any) {
+    const msg = String(e?.message || "");
+    console.error("[auth] verifyIdToken failed:", e?.code, msg.slice(0, 200));
+    if (/incorrect "aud"|incorrect "iss"/i.test(msg)) {
+      throw new ApiError(500, "FIREBASE_PROJECT_ID on the server doesn't match the Firebase project used by the website (NEXT_PUBLIC_FIREBASE_PROJECT_ID).", "CONFIG");
+    }
+    if (/credential|private key|PEM|Failed to parse|certificate/i.test(msg)) {
+      throw new ApiError(500, "Firebase Admin credentials are invalid. Re-copy the service-account values.", "CONFIG");
+    }
     throw new ApiError(401, "Your session has expired. Please sign in again.", "AUTH");
   }
   await connectDB();

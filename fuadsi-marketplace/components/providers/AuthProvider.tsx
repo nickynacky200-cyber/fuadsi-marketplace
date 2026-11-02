@@ -15,6 +15,7 @@ type AuthCtx = {
   store: StoreLite;
   loading: boolean;
   authError: string | null;
+  signedIn: boolean;
   signInWithGoogle: () => Promise<void>;
   signUpWithEmail: (name: string, email: string, password: string) => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
@@ -33,6 +34,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [store, setStore] = useState<StoreLite>(null);
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [signedIn, setSignedIn] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -43,10 +45,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {
       setMe(null);
       setStore(null);
-      if (e instanceof ApiClientError && e.code === "SUSPENDED") {
-        setAuthError(e.message);
-        await signOut(getFirebaseAuth());
-      }
+      // Never fail silently: show why the account couldn't be loaded (server config, database, token problems...)
+      setAuthError(e instanceof ApiClientError ? `${e.message}${e.status ? ` (HTTP ${e.status})` : ""}` : "Couldn't load your account.");
+      if (e instanceof ApiClientError && e.code === "SUSPENDED") await signOut(getFirebaseAuth());
     }
   }, []);
 
@@ -54,6 +55,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let unsub = () => {};
     try {
       unsub = onAuthStateChanged(getFirebaseAuth(), async (u: FbUser | null) => {
+        setSignedIn(!!u);
         if (!u) {
           setMe(null);
           setStore(null);
@@ -124,6 +126,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setStore(null);
   }, []);
 
-  const value = useMemo(() => ({ me, store, loading, authError, signInWithGoogle, signUpWithEmail, signInWithEmail, resetPassword, resendVerification, checkVerified, logout, refresh: load }), [me, store, loading, authError, signInWithGoogle, signUpWithEmail, signInWithEmail, resetPassword, resendVerification, checkVerified, logout, load]);
+  const value = useMemo(() => ({ me, store, loading, authError, signedIn, signInWithGoogle, signUpWithEmail, signInWithEmail, resetPassword, resendVerification, checkVerified, logout, refresh: load }), [me, store, loading, authError, signedIn, signInWithGoogle, signUpWithEmail, signInWithEmail, resetPassword, resendVerification, checkVerified, logout, load]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

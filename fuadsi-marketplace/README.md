@@ -61,6 +61,12 @@ Secrets are only read in server code (`lib/env.ts`). Only the Firebase **web** c
 3. **Cloudinary:** nothing else needed; uploads are signed per request and restricted to `fuadsi/<kind>/<firebase uid>/`.
 4. **Upstash:** create a Redis database (pick the region closest to your Vercel region).
 
+## Troubleshooting sign-in
+
+Enable **Google** and **Email/Password** in Firebase Authentication, and add your site's domain (e.g. `fuadsi-marketplace.vercel.app`) under Authentication, Settings, Authorized domains. After editing any `NEXT_PUBLIC_*` variable in Vercel you must **Redeploy** (they are baked in at build time). The server also accepts Vercel's Upstash names (`KV_REST_API_URL`, `KV_REST_API_TOKEN`), tolerates quoted values, and no longer blocks login when Redis or Cloudinary are missing.
+
+If you sign in but stay on the login page, open **`/api/health`**. It lists missing variables (names only) and tests MongoDB, Redis and Firebase Admin. Typical causes: Atlas Network Access not allowing your IP (use `0.0.0.0/0` on Vercel), a wrong `MONGODB_URI` password, a mangled `FIREBASE_PRIVATE_KEY` (keep it in double quotes with `\n`), or mismatched Firebase project IDs. The login page also shows the server's error message.
+
 ## Run locally
 
 ```bash

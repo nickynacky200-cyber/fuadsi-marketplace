@@ -1,3 +1,4 @@
+import "./env-clean";
 import { Redis } from "@upstash/redis";
 
 /**
@@ -125,6 +126,9 @@ export function kv(): KV {
   if (g._kv) return g._kv;
   const url = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!(url && token) && process.env.NODE_ENV === "production") {
+    console.warn("[kv] Upstash Redis is not configured: realtime delivery and rate limits are degraded (in-memory, per instance).");
+  }
   g._kv = url && token ? new UpstashKV(new Redis({ url, token })) : new MemoryKV();
   return g._kv;
 }
